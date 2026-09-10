@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Daily Journal">
+    <meta name="theme-color" content="#08080a">
+    <title>Daily Journal</title>
+
+    <!-- ファビコン・ホーム画面アイコン設定 -->
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- メインビュー -->
+    <div class="views-container">
+        <!-- サイドバー (幅230px) -->
+        <aside class="app-sidebar" id="calendarSidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title" id="sidebarTitle">JOURNALS</div>
+                <button class="sidebar-close-btn" onclick="closeSidebar()" title="閉じる" aria-label="閉じる">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- カレンダー用コンテンツ -->
+            <div class="cal-sidebar-content" id="calSidebarContent">
+                <div class="mini-cal-container" id="miniCalContainer">
+                    <div class="mini-cal-nav">
+                        <button class="mini-cal-arrow" onclick="changeMiniCalMonth(-1, 'prev')">◀</button>
+                        <span class="mini-cal-title" id="miniCalTitle">2026年 9月</span>
+                        <button class="mini-cal-arrow" onclick="changeMiniCalMonth(1, 'next')">▶</button>
+                    </div>
+                    <div class="mini-cal-weekdays">
+                        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+                    </div>
+                    <div class="mini-cal-grid-wrapper">
+                        <div class="mini-cal-grid" id="miniCalGrid"></div>
+                    </div>
+                </div>
+
+                <div class="scope-segmented-group">
+                    <button class="scope-segmented-btn active" id="btnScopeDay" onclick="setCalendarScope('day')">日</button>
+                    <button class="scope-segmented-btn" id="btnScopeWeek" onclick="setCalendarScope('week')">週</button>
+                    <button class="scope-segmented-btn" id="btnScopeMonth" onclick="setCalendarScope('month')">月</button>
+                    <button class="scope-segmented-btn" id="btnScopePhoto" onclick="setCalendarScope('photo')">写真</button>
+                </div>
+
+                <button class="cal-today-jump-btn" id="calJumpCurrentBtn" onclick="jumpToCurrentScopePeriod()">
+                    <span style="font-size: 13px;">✦</span>
+                    <span id="calJumpCurrentLabel">今日に戻る</span>
+                </button>
+
+                <div style="flex: 1;"></div>
+
+                <button class="cal-todo-btn" id="btnSidebarNotebook" onclick="setCalendarScope('notebooks')" style="margin-top: 6px;">
+                    <span style="font-size: 14px;">📔</span>
+                    <span>NOTEBOOKS</span>
+                </button>
+            </div>
+
+            <!-- Notebooks用コンテンツ -->
+            <div class="notebook-sidebar-content" id="notebookSidebarContent" style="display: none;">
+                <!-- ノート絞り込み検索窓 -->
+                <div class="sidebar-search-box">
+                    <span class="sidebar-search-icon">🔍</span>
+                    <input type="text" class="sidebar-search-input" id="notebookSearchInput" placeholder="ノートを絞り込む..." oninput="handleNotebookSearchInput(event)">
+                    <button type="button" class="sidebar-search-clear" id="notebookSearchClearBtn" onclick="clearNotebookSearch()" title="絞り込みをクリア">✕</button>
+                </div>
+
+                <!-- ステータス絞り込みセグメント (2段構成) -->
+                <div class="nb-status-segmented-group">
+                    <div class="nb-status-row">
+                        <button type="button" class="nb-status-btn active" id="nbStatus_all" onclick="setNotebookStatusFilter('all')">All</button>
+                        <button type="button" class="nb-status-btn" id="nbStatus_active" onclick="setNotebookStatusFilter('active')">Active</button>
+                    </div>
+                    <div class="nb-status-row">
+                        <button type="button" class="nb-status-btn" id="nbStatus_permanent" onclick="setNotebookStatusFilter('permanent')">Permanent</button>
+                        <button type="button" class="nb-status-btn" id="nbStatus_archive" onclick="setNotebookStatusFilter('archive')">Archive</button>
+                        <button type="button" class="nb-status-btn" id="nbStatus_trash" onclick="setNotebookStatusFilter('trash')">Trash</button>
+                    </div>
+                </div>
+
+                <div class="todo-nav-list" id="notebookNavList">
+                    <div class="todo-nav-item" id="nb-nav-grid" onclick="setNotebookViewMode('grid')">
+                        <div class="todo-nav-left"><span style="font-size: 16px;">🗂️</span> <span class="todo-nav-text">Gallery View</span></div>
+                    </div>
+                    <div class="todo-nav-item" id="nb-nav-linked" onclick="setNotebookViewMode('card')">
+                        <div class="todo-nav-left"><span style="font-size: 16px;">📖</span> <span class="todo-nav-text">Card View</span></div>
+                    </div>
+                    <div class="todo-nav-item" id="nb-nav-local-graph" onclick="setNotebookViewMode('local-graph')">
+                        <div class="todo-nav-left"><span style="font-size: 16px;">🎯</span> <span class="todo-nav-text">Local Graph</span></div>
+                    </div>
+                    <div class="todo-nav-item" id="nb-nav-graph" onclick="setNotebookViewMode('graph')">
+                        <div class="todo-nav-left"><span style="font-size: 16px;">🕸️</span> <span class="todo-nav-text">Global Graph</span></div>
+                    </div>
+                </div>
+
+                <div style="flex: 1;"></div>
+                
+                <button class="cal-todo-btn" id="btnNbSidebarJournals" onclick="setCalendarScope(previousCalendarScope || 'day')">
+                    <span style="font-size: 14px;">📅</span>
+                    <span>JOURNALS</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 右側：カードカルーセル -->
+        <div class="card-carousel-container" id="journalCarouselContainer"></div>
+    </div>
+
+    <!-- 下部ランチャーバー -->
+    <div class="bottom-launcher-bar">
+        <button class="bar-btn" id="btnCalendar" onclick="handleCalendarButtonClick()">
+            <span class="bar-btn-icon">☰</span>
+            <span>サイドバー</span>
+        </button>
+
+        <button class="bar-btn" id="btnCategory" onclick="handleCategoryButtonClick()">
+            <span class="bar-btn-icon">🗂️</span>
+            <span id="btnCategoryLabel">カテゴリ</span>
+        </button>
+
+        <button class="bar-btn" id="btnViewScope" onclick="openViewScopeModal()">
+            <span class="bar-btn-icon" id="btnViewScopeIcon">☀️</span>
+            <span id="btnViewScopeLabel">DAILY</span>
+        </button>
+
+        <div class="launcher-main-part" onclick="handleMainActionClick()">
+            <span class="launcher-main-icon" id="launcherMainIcon">+</span>
+            <span class="launcher-main-label" id="launcherMainLabel">追記</span>
+        </div>
+
+        <button class="bar-btn" id="btnToday" onclick="jumpToCurrentScopePeriod()">
+            <span class="bar-btn-icon">✦</span>
+            <span id="btnTodayLabel">今日</span>
+        </button>
+
+        <button class="bar-btn" onclick="openSearchModal()">
+            <span class="bar-btn-icon">🔍</span>
+            <span>検索</span>
+        </button>
+
+        <button class="bar-btn" onclick="openModal('settingsModal')">
+            <span class="bar-btn-icon">⚙️</span>
+            <span>設定</span>
+        </button>
+    </div>
+
+    <!-- サイドバー切り替えモーダル (NotebooksのCard View時に表示) -->
+    <div class="modal-overlay" id="sidebarToggleModal" onclick="outsideClose(event, 'sidebarToggleModal')">
+        <div class="modal-content" style="max-width: 360px;">
+            <div class="modal-header">
+                <span>サイドバーの表示切替</span>
+                <button class="sidebar-close-btn" onclick="closeModal('sidebarToggleModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin: 6px 0;">
+                <div class="option-group" style="padding: 12px 14px;">
+                    <div>
+                        <span class="option-title">左サイドバー (メニュー)</span>
+                        <div class="option-desc">ビュー選択・検索</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleLeftSidebarSwitch" onchange="toggleLeftSidebar(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="option-group" style="padding: 12px 14px;">
+                    <div>
+                        <span class="option-title">右サイドバー (Linked Notes)</span>
+                        <div class="option-desc">関連ノート一覧</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleRightSidebarSwitch" onchange="toggleRightSidebar(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <button class="modal-btn submit" onclick="closeModal('sidebarToggleModal')">完了</button>
+        </div>
+    </div>
+
+    <!-- 表示ビュー切り替えポップアップモーダル -->
+    <div class="modal-overlay" id="viewScopeModal" onclick="outsideClose(event, 'viewScopeModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>表示ビューの切り替え</span>
+                <button class="sidebar-close-btn" onclick="closeModal('viewScopeModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="view-scope-list" id="viewScopeModalList">
+                <div class="view-scope-item" id="scopeItem_day" onclick="selectScopeFromModal('day')">
+                    <div class="view-scope-left">
+                        <div class="view-scope-icon-box">☀️</div>
+                        <div class="view-scope-text">
+                            <span class="view-scope-eyebrow">DAILY JOURNAL</span>
+                            <span class="view-scope-name">DAILY</span>
+                            <span class="view-scope-desc">1日ごとの詳細なタイムライン</span>
+                        </div>
+                    </div>
+                    <span class="view-scope-check">✓</span>
+                </div>
+
+                <div class="view-scope-item" id="scopeItem_week" onclick="selectScopeFromModal('week')">
+                    <div class="view-scope-left">
+                        <div class="view-scope-icon-box">🗓️</div>
+                        <div class="view-scope-text">
+                            <span class="view-scope-eyebrow">WEEKLY JOURNAL</span>
+                            <span class="view-scope-name">WEEKLY</span>
+                            <span class="view-scope-desc">月曜〜日曜の1週間のまとめ</span>
+                        </div>
+                    </div>
+                    <span class="view-scope-check">✓</span>
+                </div>
+
+                <div class="view-scope-item" id="scopeItem_month" onclick="selectScopeFromModal('month')">
+                    <div class="view-scope-left">
+                        <div class="view-scope-icon-box">📅</div>
+                        <div class="view-scope-text">
+                            <span class="view-scope-eyebrow">MONTHLY JOURNAL</span>
+                            <span class="view-scope-name">MONTHLY</span>
+                            <span class="view-scope-desc">月単位で全体の流れを俯瞰</span>
+                        </div>
+                    </div>
+                    <span class="view-scope-check">✓</span>
+                </div>
+
+                <div class="view-scope-item" id="scopeItem_photo" onclick="selectScopeFromModal('photo')">
+                    <div class="view-scope-left">
+                        <div class="view-scope-icon-box">📸</div>
+                        <div class="view-scope-text">
+                            <span class="view-scope-eyebrow">PHOTO JOURNAL</span>
+                            <span class="view-scope-name">PHOTO</span>
+                            <span class="view-scope-desc">写真付きの記録のみをアルバム表示</span>
+                        </div>
+                    </div>
+                    <span class="view-scope-check">✓</span>
+                </div>
+                
+                <div class="view-scope-divider" id="modalNotebookDivider"></div>
+
+                <div class="view-scope-item notebook-scope" id="scopeItem_notebooks" onclick="selectScopeFromModal('notebooks')">
+                    <div class="view-scope-left">
+                        <div class="view-scope-icon-box" style="color: var(--notebook-color);">📔</div>
+                        <div class="view-scope-text">
+                            <span class="view-scope-eyebrow">NOTEBOOKS</span>
+                            <span class="view-scope-name">NOTEBOOKS</span>
+                            <span class="view-scope-desc">独立したカード型ノート</span>
+                        </div>
+                    </div>
+                    <span class="view-scope-check">✓</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- カテゴリ・タイプ選択ポップアップモーダル -->
+    <div class="modal-overlay" id="categorySelectModal" onclick="outsideClose(event, 'categorySelectModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>カテゴリ・タイプ絞り込み</span>
+                <button class="sidebar-close-btn" onclick="closeModal('categorySelectModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="cat-filter-modal-list" id="catFilterModalList"></div>
+        </div>
+    </div>
+
+    <!-- 追記用ポップアップモーダル -->
+    <div class="modal-overlay" id="addModal" onclick="outsideClose(event, 'addModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>タイムラインに追記</span>
+                    <span class="modal-target-badge" id="modalTargetDateBadge">今日</span>
+                </div>
+                <span class="modal-time-badge" id="modalCurrentTimeBadge">12:00</span>
+            </div>
+            
+            <div class="category-picker-section">
+                <div class="category-chips-scroll" id="addCategoryChipsContainer"></div>
+            </div>
+
+            <textarea id="journalInputText" placeholder="いま起きたことや記録を入力..."></textarea>
+
+            <div class="photo-attach-section">
+                <div class="photo-attach-bar">
+                    <div class="photo-attach-left">
+                        <button class="photo-btn" onclick="triggerPhotoSelect('add')">
+                            <span>📷 写真を追加</span>
+                        </button>
+                        <span class="photo-size-notice">自動縮小</span>
+                    </div>
+
+                    <div class="msg-type-pill-group" id="addMsgTypeSegmented">
+                        <button type="button" class="msg-pill-btn active" id="addMsgType_normal" onclick="setMessageType('add', 'normal')" title="通常のメモ">
+                            <span>📝</span><span>通常</span>
+                        </button>
+                        <button type="button" class="msg-pill-btn type-incoming" id="addMsgType_incoming" onclick="setMessageType('add', 'incoming')" title="相手からのSlack">
+                            <span>📥</span><span>相手</span>
+                        </button>
+                        <button type="button" class="msg-pill-btn type-outgoing" id="addMsgType_outgoing" onclick="setMessageType('add', 'outgoing')" title="自分からのSlack">
+                            <span>📤</span><span>自分</span>
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="addPhotoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotosSelected(event, 'add')">
+                <div class="photo-previews-container" id="addPhotoPreviewsContainer"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeModal('addModal')">キャンセル</button>
+                <button class="modal-btn submit" onclick="saveNewLog()">追加する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ノート用画像選択ファイル入力要素 -->
+    <input type="file" id="notebookPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleNotebookPhotosSelected(event)">
+
+    <!-- 関連ノートリンク用ポップアップモーダル -->
+    <div class="modal-overlay" id="linkNotebookModal" onclick="outsideClose(event, 'linkNotebookModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>関連ノートをリンク</span>
+                <button class="sidebar-close-btn" onclick="closeModal('linkNotebookModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <input type="text" class="search-input" id="linkNotebookSearchInput" placeholder="リンクするノートを検索..." oninput="handleLinkNotebookSearchInput(event)">
+            
+            <div class="nb-link-modal-list" id="linkNotebookListContainer"></div>
+
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeModal('linkNotebookModal')">キャンセル</button>
+                <button class="modal-btn submit" onclick="saveNotebookLinksFromModal()">リンクを保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ノートブックエクスポート用ポップアップモーダル -->
+    <div class="modal-overlay" id="exportNotebookModal" onclick="outsideClose(event, 'exportNotebookModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>ノートのエクスポート</span>
+                </div>
+                <button class="sidebar-close-btn" onclick="closeModal('exportNotebookModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
+                出力対象: <strong id="exportNotebookTargetTitle" style="color: var(--text-primary);"></strong>
+            </div>
+
+            <div class="export-options-list">
+                <button type="button" class="export-option-card" onclick="executeNotebookExport('html')">
+                    <div class="export-option-icon">🌐</div>
+                    <div class="export-option-info">
+                        <div class="export-option-title">HTML形式で出力</div>
+                        <div class="export-option-desc">装飾・画像を埋め込んだ単一のHTMLファイルとして保存します</div>
+                    </div>
+                    <span class="export-option-arrow">›</span>
+                </button>
+
+                <button type="button" class="export-option-card" onclick="executeNotebookExport('pdf')">
+                    <div class="export-option-icon">📑</div>
+                    <div class="export-option-info">
+                        <div class="export-option-title">PDF形式で出力 (印刷)</div>
+                        <div class="export-option-desc">印刷プレビューを開き、PDFファイルとして保存・印刷します</div>
+                    </div>
+                    <span class="export-option-arrow">›</span>
+                </button>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 4px;">
+                <button class="modal-btn cancel" style="width: 100%;" onclick="closeModal('exportNotebookModal')">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編集用ポップアップモーダル -->
+    <div class="modal-overlay" id="editModal" onclick="outsideClose(event, 'editModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>記録を編集</span>
+                <span class="modal-time-badge" id="editModalTimeBadge">12:00</span>
+            </div>
+
+            <div class="category-picker-section">
+                <div class="category-chips-scroll" id="editCategoryChipsContainer"></div>
+            </div>
+
+            <textarea id="editInputText" placeholder="記録内容を編集..."></textarea>
+
+            <div class="photo-attach-section">
+                <div class="photo-attach-bar">
+                    <div class="photo-attach-left">
+                        <button class="photo-btn" onclick="triggerPhotoSelect('edit')">
+                            <span>📷 写真を追加</span>
+                        </button>
+                        <span class="photo-size-notice">自動縮小</span>
+                    </div>
+
+                    <div class="msg-type-pill-group" id="editMsgTypeSegmented">
+                        <button type="button" class="msg-pill-btn active" id="editMsgType_normal" onclick="setMessageType('edit', 'normal')" title="通常のメモ">
+                            <span>📝</span><span>通常</span>
+                        </button>
+                        <button type="button" class="msg-pill-btn type-incoming" id="editMsgType_incoming" onclick="setMessageType('edit', 'incoming')" title="相手からのSlack">
+                            <span>📥</span><span>相手</span>
+                        </button>
+                        <button type="button" class="msg-pill-btn type-outgoing" id="editMsgType_outgoing" onclick="setMessageType('edit', 'outgoing')" title="自分からのSlack">
+                            <span>📤</span><span>自分</span>
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="editPhotoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotosSelected(event, 'edit')">
+                <div class="photo-previews-container" id="editPhotoPreviewsContainer"></div>
+            </div>
+
+            <div class="modal-actions three-columns">
+                <button class="modal-btn delete" onclick="deleteFromEditModal()">削除</button>
+                <button class="modal-btn cancel" onclick="closeModal('editModal')">キャンセル</button>
+                <button class="modal-btn submit" onclick="saveEditedLog()">更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 写真拡大ライトボックス -->
+    <div class="lightbox-overlay" id="lightboxModal" onclick="closeLightbox()">
+        <img src="" class="lightbox-img" id="lightboxImg" alt="拡大写真">
+    </div>
+
+    <!-- 検索ポップアップモーダル -->
+    <div class="modal-overlay" id="searchModal" onclick="outsideClose(event, 'searchModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>過去の記録を検索</span>
+            </div>
+            <input type="text" class="search-input" id="searchInput" placeholder="キーワード・カテゴリ・受信・送信・Slack..." oninput="handleSearchInput()">
+            <div class="search-results-container" id="searchResultsContainer">
+                <div style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 20px;">キーワードを入力してください</div>
+            </div>
+            <button class="modal-btn cancel" style="width: 100%;" onclick="closeModal('searchModal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 設定モーダル -->
+    <div class="modal-overlay" id="settingsModal" onclick="outsideClose(event, 'settingsModal')">
+        <div class="modal-content settings-content">
+            <div class="modal-header">
+                <span>設定</span>
+                <button class="sidebar-close-btn" onclick="closeModal('settingsModal')" title="閉じる">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-segmented-group">
+                <button type="button" class="settings-segmented-btn active" id="tabBtnGeneral" onclick="switchSettingsTab('general')">基本設定</button>
+                <button type="button" class="settings-segmented-btn" id="tabBtnCategories" onclick="switchSettingsTab('categories')">カテゴリ管理</button>
+                <button type="button" class="settings-segmented-btn" id="tabBtnTypes" onclick="switchSettingsTab('types')">タイプ管理</button>
+                <button type="button" class="settings-segmented-btn" id="tabBtnData" onclick="switchSettingsTab('data')">データ管理</button>
+            </div>
+
+            <div class="settings-page active" id="settingsPageGeneral">
+                <div class="option-group">
+                    <span class="option-title">ライトテーマ</span>
+                    <label class="switch">
+                        <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">空のカードをスキップ</span>
+                        <div class="option-desc">日・週・月で書き込みのないカードを非表示</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="hideEmptyCardsToggle" onchange="toggleHideEmptyCards()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- Gallery View 列数設定 -->
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">Gallery View の列数</span>
+                        <div class="option-desc">全画面で4個、サイドバー時は3個に自動調整</div>
+                    </div>
+                    <select class="settings-select" id="galleryColumnsSelect" onchange="changeGalleryColumns(this.value)">
+                        <option value="auto">オート (自動調整)</option>
+                        <option value="3">3個 固定</option>
+                        <option value="4">4個 固定</option>
+                        <option value="5">5個 固定</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-page" id="settingsPageCategories">
+                <div class="category-management-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="option-title">カテゴリ一覧・追加</span>
+                        <span id="catCountIndicator" style="font-size: 12px; color: var(--text-secondary); font-weight: 700;">10/30</span>
+                    </div>
+                    <div class="category-list-manage" id="settingsCategoryList"></div>
+                    <div class="category-add-row" id="catAddForm">
+                        <input type="text" class="category-add-input" id="newCatName" placeholder="カテゴリ名">
+                        <select class="category-add-select" id="newCatType">
+                            <option value="研究管理">研究管理</option>
+                            <option value="ログ">ログ</option>
+                            <option value="一般">一般</option>
+                        </select>
+                        <button class="data-action-btn" onclick="addNewCategory()">追加</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-page" id="settingsPageTypes">
+                <div class="category-management-box">
+                    <div>
+                        <span class="option-title">タイプ別 Notebooks利用設定</span>
+                        <div class="option-desc">オンにしたフィルター状態でNotebooks機能を表示</div>
+                    </div>
+                    <div id="typeNotebookSettingsList" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;"></div>
+                </div>
+                
+                <div class="category-management-box">
+                    <div>
+                        <span class="option-title">タイプ別 Slack連携設定</span>
+                        <div class="option-desc">オンにしたタイプでSlack（受信・送信）メッセージ機能が有効に</div>
+                    </div>
+                    <div id="typeSlackSettingsList" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;"></div>
+                </div>
+            </div>
+
+            <div class="settings-page" id="settingsPageData">
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">閲覧用アーカイブ出力</span>
+                        <div class="option-desc">単一のHTMLとしてエクスポート</div>
+                    </div>
+                    <button class="data-action-btn" id="btnExportArchive" onclick="exportArchiveHtml()">出力</button>
+                </div>
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">日付別HTML一括出力</span>
+                        <div class="option-desc">フォルダを選んで日付ごとに出力</div>
+                    </div>
+                    <button class="data-action-btn" onclick="exportHtmlFiles()">フォルダへ出力</button>
+                </div>
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">データのエクスポート</span>
+                        <div class="option-desc">記録をバックアップ（JSON保存）</div>
+                    </div>
+                    <button class="data-action-btn" onclick="exportData()">書き出し</button>
+                </div>
+                <div class="option-group">
+                    <div>
+                        <span class="option-title">データのインポート</span>
+                        <div class="option-desc">ファイルからデータを読み込み</div>
+                    </div>
+                    <button class="data-action-btn" onclick="triggerImport()">読み込み</button>
+                </div>
+                <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importData(event)">
+            </div>
+
+            <button class="modal-btn submit" style="margin-top: 6px;" onclick="closeModal('settingsModal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- 分割したJSファイルを順番に読み込む -->
+    <script src="main.js"></script>
+    <script src="calendar.js"></script>
+    <script src="notebooks.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
