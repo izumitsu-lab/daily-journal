@@ -24,7 +24,11 @@ let categories = JSON.parse(localStorage.getItem('daily_journal_categories')) ||
 let typeSlackSettings = JSON.parse(localStorage.getItem('daily_journal_type_slack')) || DEFAULT_TYPE_SLACK;
 let typeNotebookSettings = JSON.parse(localStorage.getItem('daily_journal_type_notebook')) || DEFAULT_TYPE_NOTEBOOK;
 
-let lightThemeEnabled = localStorage.getItem('daily_journal_theme') === 'true';
+// デフォルトで明るいテーマ（ライトテーマ）を有効化
+let lightThemeEnabled = localStorage.getItem('daily_journal_theme') !== null 
+    ? localStorage.getItem('daily_journal_theme') === 'true' 
+    : true;
+
 let hideEmptyCards = localStorage.getItem('daily_journal_hide_empty') === 'true';
 
 // Gallery View 列数設定 ('auto', '3', '4', '5')
